@@ -1,0 +1,253 @@
+import time
+from typing import Optional, List
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, func
+
+from app.models.storage import StorageEngine
+from app.core.storages.factory import StorageFactory
+from app.core.storage_cache import storage_cache
+from app.core.exceptions import AppException, ERROR_CODES
+
+
+class StorageService:
+    """存储引擎服务"""
+    
+    @staticmethod
+    async def get_all(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100,
+        is_active: Optional[bool] = None
+    ) -> List[StorageEngine]:
+        """获取所有存储引擎"""
+        query = select(StorageEngine)
+        
+        if is_active is not None:
+            query = query.where(StorageEngine.is_active == is_active)
+        
+        query = query.offset(skip).limit(limit).order_by(StorageEngine.created_at.desc())
+        
+        result = await db.execute(query)
+        return list(result.scalars().all())
+    
+    @staticmethod
+    async def get_by_id(db: AsyncSession, storage_id: int) -> Optional[StorageEngine]:
+        """根据ID获取存储引擎"""
+        result = await db.execute(
+            select(StorageEngine).where(StorageEngine.id == storage_id)
+        )
+        return result.scalar_one_or_none()
+    
+    @staticmethod
+    async def get_default(db: AsyncSession) -> Optional[StorageEngine]:
+        """获取默认存储引擎"""
+        result = await db.execute(
+            select(StorageEngine)
+            .where(StorageEngine.is_default == True)
+            .where(StorageEngine.is_active == True)
+        )
+        return result.scalar_one_or_none()
+    
+    @staticmethod
+    async def create(db: AsyncSession, storage_data: dict) -> StorageEngine:
+        """创建存储引擎"""
+        # 如果是第一个存储引擎，自动设为默认
+        count_result = await db.execute(select(func.count(StorageEngine.id)))
+        count = count_result.scalar()
+        is_default = count == 0
+        
+        # 如果设为默认，需要取消其他默认
+        if is_default:
+            await db.execute(
+                update(StorageEngine).values(is_default=False)
+            )
+        
+        storage = StorageEngine(
+            name=storage_data["name"],
+            type=storage_data["type"],
+            config=storage_data["config"],
+            path_rule=storage_data.get("path_rule", "uploads/{date}/{filename}.{ext}"),
+            max_capacity=storage_data.get("max_capacity"),
+            is_active=storage_data.get("is_active", True),
+            is_default=is_default
+        )
+        
+        db.add(storage)
+        await db.commit()
+        await db.refresh(storage)
+        
+        # 添加到缓存
+        if storage.is_active:
+            storage_cache.add_storage(storage)
+        
+        return storage
+    
+    @staticmethod
+    async def update(
+        db: AsyncSession,
+        storage_id: int,
+        storage_data: dict
+    ) -> Optional[StorageEngine]:
+        """更新存储引擎"""
+        storage = await StorageService.get_by_id(db, storage_id)
+        if not storage:
+            return None
+        
+        # 如果设为默认，需要取消其他默认
+        if storage_data.get("is_default") is True:
+            await db.execute(
+                update(StorageEngine)
+                .where(StorageEngine.id != storage_id)
+                .values(is_default=False)
+            )
+            storage_data["is_default"] = True
+        
+        # 更新字段
+        for key, value in storage_data.items():
+            if value is not None:
+                setattr(storage, key, value)
+        
+        await db.commit()
+        await db.refresh(storage)
+        
+        # 更新缓存
+        storage_cache.update_storage(storage)
+        
+        return storage
+    
+    @staticmethod
+    async def delete(db: AsyncSession, storage_id: int) -> bool:
+        """删除存储引擎"""
+        storage = await StorageService.get_by_id(db, storage_id)
+        if not storage:
+            return False
+        
+        # 检查是否有图片使用此存储引擎
+        from app.models.image import Image
+        count_result = await db.execute(
+            select(func.count(Image.id))
+            .where(Image.storage_engine_id == storage_id)
+        )
+        image_count = count_result.scalar()
+        
+        if image_count > 0:
+            raise AppException(
+                status_code=400,
+                detail=f"无法删除存储引擎，仍有 {image_count} 张图片使用此存储引擎",
+                error_code="STORAGE_IN_USE"
+            )
+        
+        # 从缓存中删除
+        storage_cache.delete_storage(storage_id)
+        
+        await db.delete(storage)
+        await db.commit()
+        return True
+    
+    @staticmethod
+    async def set_default(db: AsyncSession, storage_id: int) -> Optional[StorageEngine]:
+        """设置默认存储引擎"""
+        storage = await StorageService.get_by_id(db, storage_id)
+        if not storage:
+            return None
+        
+        if not storage.is_active:
+            raise AppException(
+                status_code=400,
+                detail="无法将非激活的存储引擎设为默认",
+                error_code="STORAGE_DISABLED"
+            )
+        
+        # 取消其他默认
+        await db.execute(
+            update(StorageEngine)
+            .where(StorageEngine.id != storage_id)
+            .values(is_default=False)
+        )
+        
+        # 设置当前为默认
+        storage.is_default = True
+        await db.commit()
+        await db.refresh(storage)
+        
+        # 更新缓存中的默认存储引擎
+        storage_cache.update_default_storage(storage_id)
+        
+        return storage
+    
+    @staticmethod
+    async def test_connection(db: AsyncSession, storage_id: int) -> dict:
+        """测试存储引擎连接"""
+        storage = await StorageService.get_by_id(db, storage_id)
+        if not storage:
+            raise AppException(
+                status_code=404,
+                detail="存储引擎不存在",
+                error_code=ERROR_CODES["STORAGE_NOT_FOUND"]
+            )
+        
+        try:
+            # 创建存储实例
+            storage_instance = StorageFactory.create(
+                storage.type,
+                {"name": storage.name, "type": storage.type, **storage.config}
+            )
+            
+            # 测试连接
+            start_time = time.time()
+            success = await storage_instance.test_connection()
+            latency = (time.time() - start_time) * 1000  # 转换为毫秒
+            
+            return {
+                "success": success,
+                "message": "连接成功" if success else "连接失败",
+                "latency": round(latency, 2) if success else None
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"连接测试失败: {str(e)}",
+                "latency": None
+            }
+    
+    @staticmethod
+    async def get_usage(db: AsyncSession, storage_id: int) -> dict:
+        """获取存储引擎使用情况"""
+        storage = await StorageService.get_by_id(db, storage_id)
+        if not storage:
+            raise AppException(
+                status_code=404,
+                detail="存储引擎不存在",
+                error_code=ERROR_CODES["STORAGE_NOT_FOUND"]
+            )
+        
+        try:
+            # 创建存储实例
+            storage_instance = StorageFactory.create(
+                storage.type,
+                {"name": storage.name, "type": storage.type, **storage.config}
+            )
+            
+            # 获取使用情况
+            usage = await storage_instance.get_usage()
+            
+            # 计算使用百分比
+            usage_percent = None
+            if storage.max_capacity and storage.max_capacity > 0:
+                usage_percent = (usage["used_capacity"] / storage.max_capacity) * 100
+            
+            return {
+                "used_capacity": usage["used_capacity"],
+                "max_capacity": storage.max_capacity,
+                "usage_percent": round(usage_percent, 2) if usage_percent else None,
+                "file_count": usage.get("file_count"),
+                "available": usage.get("available", True)
+            }
+        except Exception as e:
+            return {
+                "used_capacity": storage.used_capacity,
+                "max_capacity": storage.max_capacity,
+                "usage_percent": None,
+                "file_count": None,
+                "available": False
+            }
