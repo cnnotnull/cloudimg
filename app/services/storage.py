@@ -122,11 +122,12 @@ class StorageService:
         if not storage:
             return False
         
-        # 检查是否有图片使用此存储引擎
+        # 检查是否有未删除的图片使用此存储引擎
         from app.models.image import Image
         count_result = await db.execute(
             select(func.count(Image.id))
             .where(Image.storage_engine_id == storage_id)
+            .where(Image.is_deleted == False)
         )
         image_count = count_result.scalar()
         
@@ -136,6 +137,13 @@ class StorageService:
                 detail=f"无法删除存储引擎，仍有 {image_count} 张图片使用此存储引擎",
                 error_code="STORAGE_IN_USE"
             )
+        
+        # 硬删除所有已软删除的图片记录（避免外键约束冲突）
+        deleted_images = await db.execute(
+            select(Image).where(Image.storage_engine_id == storage_id).where(Image.is_deleted == True)
+        )
+        for img in deleted_images.scalars().all():
+            await db.delete(img)
         
         # 从缓存中删除
         storage_cache.delete_storage(storage_id)
