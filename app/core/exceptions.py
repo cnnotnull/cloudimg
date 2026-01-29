@@ -26,7 +26,7 @@ ERROR_CODES = {
     "INTERNAL_ERROR": "服务器内部错误",
     # 存储相关错误
     "STORAGE_NOT_FOUND": "存储引擎不存在",
-    "STORAGE_DISABLED": "存储引擎已禁用",
+    "STORAGE_DISABLED": "存储引擎未激活",
     "STORAGE_FULL": "存储空间不足",
     "STORAGE_CONNECTION_FAILED": "存储连接失败",
     # 图片相关错误
