@@ -9,8 +9,8 @@ class LocalStorage(StorageBase):
     def __init__(self, config: dict):
         super().__init__(config)
         # base_path参数与settings.UPLOAD_DIR拼接
-        config_base_path = config.get("base_path", "")
-        self.base_path = Path(settings.UPLOAD_DIR) / config_base_path
+        self.config_base_path = config.get("base_path", "")
+        self.base_path = Path(settings.UPLOAD_DIR) / self.config_base_path
         self.base_url = config.get("base_url", "http://localhost:8000/uploads")
         # 确保目录存在
         self.base_path.mkdir(parents=True, exist_ok=True)
@@ -25,8 +25,9 @@ class LocalStorage(StorageBase):
         with open(full_path, "wb") as f:
             f.write(file_data)
         print(f"[LocalStorage] 文件已保存到: {full_path}")
-        # 返回访问URL
-        return f"{self.base_url.rstrip('/')}/{file_path}"
+        # 返回访问URL，需要加上config_base_path
+        url_path = f"{self.config_base_path}/{file_path}" if self.config_base_path else file_path
+        return f"{self.base_url.rstrip('/')}/{url_path.lstrip('/')}"
     
     async def download(self, file_path: str) -> bytes:
         """从本地存储下载文件"""
@@ -52,7 +53,8 @@ class LocalStorage(StorageBase):
     
     async def get_url(self, file_path: str) -> str:
         """获取文件访问URL"""
-        return f"{self.base_url.rstrip('/')}/{file_path}"
+        url_path = f"{self.config_base_path}/{file_path}" if self.config_base_path else file_path
+        return f"{self.base_url.rstrip('/')}/{url_path.lstrip('/')}"
     
     async def test_connection(self) -> bool:
         """测试本地存储连接（检查目录是否可写）"""
