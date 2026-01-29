@@ -88,24 +88,39 @@ class StorageService:
         storage_id: int,
         storage_data: dict
     ) -> Optional[StorageEngine]:
-        """更新存储引擎"""
+        """
+        更新存储引擎（只允许更新名称、状态和容量）
+        
+        Args:
+            db: 数据库会话
+            storage_id: 存储引擎ID
+            storage_data: 更新数据，包含name、is_active、max_capacity字段
+            
+        Returns:
+            更新后的存储引擎实例
+        """
         storage = await StorageService.get_by_id(db, storage_id)
         if not storage:
             return None
         
-        # 如果设为默认，需要取消其他默认
-        if storage_data.get("is_default") is True:
-            await db.execute(
-                update(StorageEngine)
-                .where(StorageEngine.id != storage_id)
-                .values(is_default=False)
-            )
-            storage_data["is_default"] = True
+        # 更新名称
+        if "name" in storage_data and storage_data["name"] is not None:
+            storage.name = storage_data["name"]
         
-        # 更新字段
-        for key, value in storage_data.items():
-            if value is not None:
-                setattr(storage, key, value)
+        # 更新状态
+        if "is_active" in storage_data and storage_data["is_active"] is not None:
+            storage.is_active = storage_data["is_active"]
+        
+        # 更新容量（必须大于已使用容量，或设置为None表示无限制）
+        if "max_capacity" in storage_data:
+            new_capacity = storage_data["max_capacity"]
+            if new_capacity is not None and new_capacity < storage.used_capacity:
+                raise AppException(
+                    status_code=400,
+                    detail=f"容量设置无效：新容量 ({new_capacity} 字节) 必须大于已使用容量 ({storage.used_capacity} 字节)",
+                    error_code="INVALID_CAPACITY"
+                )
+            storage.max_capacity = new_capacity
         
         await db.commit()
         await db.refresh(storage)

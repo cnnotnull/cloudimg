@@ -23,13 +23,10 @@ class StorageEngineCreate(StorageEngineBase):
 
 
 class StorageEngineUpdate(BaseModel):
-    """更新存储引擎请求"""
+    """更新存储引擎请求（只允许修改名称、状态和容量）"""
     name: Optional[str] = Field(None, description="存储引擎名称", max_length=100)
-    config: Optional[dict] = Field(None, description="存储配置")
-    path_rule: Optional[str] = Field(None, description="路径规则", max_length=500)
-    max_capacity: Optional[int] = Field(None, description="最大容量（字节）")
     is_active: Optional[bool] = Field(None, description="是否激活")
-    is_default: Optional[bool] = Field(None, description="是否设为默认")
+    max_capacity: Optional[int] = Field(None, description="最大容量（字节），必须大于已使用容量", ge=0)
 
 
 class StorageEngineResponse(StorageEngineBase):
