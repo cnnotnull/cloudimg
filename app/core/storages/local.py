@@ -8,7 +8,9 @@ class LocalStorage(StorageBase):
     
     def __init__(self, config: dict):
         super().__init__(config)
-        self.base_path = Path(config.get("base_path", settings.UPLOAD_DIR))
+        # base_path参数与settings.UPLOAD_DIR拼接
+        config_base_path = config.get("base_path", "")
+        self.base_path = Path(settings.UPLOAD_DIR) / config_base_path
         self.base_url = config.get("base_url", "http://localhost:8000/uploads")
         # 确保目录存在
         self.base_path.mkdir(parents=True, exist_ok=True)
