@@ -1,9 +1,11 @@
 from typing import List, Optional
+from datetime import datetime, date
 from fastapi import APIRouter, Depends, UploadFile, File, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.database import get_db
 from app.services.image import ImageService
+from app.services.storage import StorageService
 from app.schemas.image import ImageResponse, ImageUploadResponse, ImageListQuery
 from app.schemas.response import BaseResponse
 from app.core.exceptions import AppException, ERROR_CODES
@@ -108,19 +110,50 @@ async def upload_images_batch(
 async def get_images(
     skip: int = Query(0, ge=0, description="跳过数量"),
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
-    storage_engine_id: Optional[int] = Query(None, description="存储引擎ID"),
+    image_date: Optional[date] = Query(None, description="图片日期，格式：YYYY-MM-DD，为空则返回当天"),
+    storage_engine_id: Optional[int] = Query(None, description="存储引擎ID，为空则返回默认存储引擎的数据"),
     file_type: Optional[str] = Query(None, description="文件类型"),
     is_deleted: Optional[bool] = Query(None, description="是否已删除"),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取图片列表"""
+    """
+    获取图片列表
+    
+    Args:
+        skip: 跳过数量
+        limit: 返回数量
+        image_date: 图片日期，为空则返回当天数据
+        storage_engine_id: 存储引擎ID，为空则返回默认存储引擎的数据
+        file_type: 文件类型
+        is_deleted: 是否已删除
+    """
+    # 处理日期参数：如果为空，默认返回当天的数据
+    if image_date is None:
+        today = datetime.now().date()
+        start_date = datetime.combine(today, datetime.min.time())
+        end_date = datetime.combine(today, datetime.max.time())
+    else:
+        start_date = datetime.combine(image_date, datetime.min.time())
+        end_date = datetime.combine(image_date, datetime.max.time())
+    
+    # 处理存储引擎ID：如果为空，使用默认存储引擎
+    if storage_engine_id is None:
+        default_storage = await StorageService.get_default(db)
+        if default_storage:
+            storage_engine_id = default_storage.id
+        else:
+            # 如果没有默认存储引擎，不限制存储引擎ID
+            storage_engine_id = None
+    
     images, total = await ImageService.get_list(
         db=db,
         skip=skip,
         limit=limit,
         storage_engine_id=storage_engine_id,
         file_type=file_type,
-        is_deleted=is_deleted
+        is_deleted=is_deleted,
+        start_date=start_date,
+        end_date=end_date
     )
     
     page = (skip // limit) + 1 if limit > 0 else 1
