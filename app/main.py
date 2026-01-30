@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-import hashlib
 from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.settings import settings
-from app.config.database import init_db, engine
+from app.config.database import engine
 from app.api import storage_router, image_router, config_router, auth_router
 from app.core.exceptions import AppException, ERROR_CODES
 from app.schemas.response import BaseResponse, ResponseMessages
@@ -32,16 +31,34 @@ async def lifespan(app: FastAPI):
     # 初始化系统配置
     from app.config.database import get_db
     from app.services.config import ConfigService
+    from sqlalchemy import select
+    from app.models.config import SystemConfig
+    
     async for db in get_db():
-        # 初始化默认配置
-        count = await ConfigService.initialize_defaults(db)
-        if count > 0:
-            print(f"[OK]    初始化了 {count} 条默认配置")
+        # 确保只使用一个数据库会话完成所有初始化
+        # 初始化默认配置（如果不存在）
+        result = await db.execute(select(SystemConfig.key))
+        existing_keys = {row[0] for row in result.all()}
         
-        # 加载配置到缓存
-        configs = await ConfigService.get_all(db)
-        await config_cache.initialize(configs)
-        print("[OK]    系统配置缓存初始化完成")
+        configs_to_add = []
+        for key, value in ConfigService.DEFAULT_CONFIGS.items():
+            if key not in existing_keys:
+                config = SystemConfig(key=key, value=value)
+                configs_to_add.append(config)
+        
+        if configs_to_add:
+            db.add_all(configs_to_add)
+            print(f"[OK]    初始化了 {len(configs_to_add)} 条默认配置")
+        
+        # 加载所有配置到缓存（从数据库直接读取，不从缓存）
+        result = await db.execute(select(SystemConfig))
+        db_configs = result.scalars().all()
+        configs_dict = {config.key: config.value for config in db_configs}
+        await config_cache.initialize(configs_dict)
+        print(f"[OK]    系统配置缓存初始化完成（共 {len(configs_dict)} 条配置）")
+        
+        # 提交所有更改（默认配置初始化）
+        await db.commit()
         
         # 初始化存储引擎缓存
         await storage_cache.initialize(db)

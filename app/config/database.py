@@ -82,9 +82,3 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             yield session
         finally:
             await session.close()
-
-
-async def init_db():
-    """初始化数据库表（仅用于开发，生产环境应使用 Alembic）"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
