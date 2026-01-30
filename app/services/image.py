@@ -41,8 +41,10 @@ class ImageService:
         # 读取文件数据
         file_data = await file.read()
         
-        # 验证文件
-        is_valid, error_msg = validate_image_file(file)
+        # 验证文件 - 从系统配置获取允许的图片类型
+        allowed_types_str = await config_cache.get_allowed_image_types()
+        allowed_types = [t.strip() for t in allowed_types_str.split(',') if t.strip()]
+        is_valid, error_msg = validate_image_file(file, allowed_types=allowed_types)
         if not is_valid:
             raise AppException(
                 status_code=400,

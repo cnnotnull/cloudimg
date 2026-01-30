@@ -14,20 +14,22 @@ def calculate_sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def validate_image_file(file: UploadFile, max_size: Optional[int] = None) -> tuple[bool, Optional[str]]:
+def validate_image_file(file: UploadFile, max_size: Optional[int] = None, allowed_types: Optional[list] = None) -> tuple[bool, Optional[str]]:
     """
     验证图片文件
     
     Args:
         file: 上传的文件
         max_size: 最大文件大小（字节），None使用默认值
+        allowed_types: 允许的文件类型列表，None使用默认值
         
     Returns:
         (是否有效, 错误信息)
     """
     # 检查文件类型
-    if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
-        return False, f"不支持的文件类型: {file.content_type}，支持的格式: {', '.join(settings.ALLOWED_IMAGE_TYPES)}"
+    types_to_check = allowed_types or settings.ALLOWED_IMAGE_TYPES
+    if file.content_type not in types_to_check:
+        return False, f"不支持的文件类型: {file.content_type}，支持的格式: {', '.join(types_to_check)}"
     
     # 检查文件大小（注意：这里只能检查content_length，实际大小需要读取后验证）
     max_size = max_size or settings.MAX_UPLOAD_SIZE
