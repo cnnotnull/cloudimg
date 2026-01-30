@@ -63,17 +63,9 @@ class ImageService:
         md5_hash = calculate_md5(file_data)
         sha256_hash = calculate_sha256(file_data)
         
-        # 检查是否已存在（通过MD5或SHA256）
-        existing_image = await db.execute(
-            select(Image).where(
-                (Image.md5 == md5_hash) | (Image.sha256 == sha256_hash)
-            ).where(Image.is_deleted == False)
-        )
-        existing = existing_image.scalar_one_or_none()
-        # TODO 记录存储数据库，但是图片不再上传云端，直接使用已有路径
-        if existing:
-            # 如果已存在且未删除，返回现有记录
-            return existing
+        # 生成带时间戳的文件名
+        import time
+        timestamp = str(int(time.time()))
         
         # 获取存储引擎配置
         if storage_engine_id:
@@ -111,11 +103,14 @@ class ImageService:
         # 获取图片信息
         image_info = get_image_info(file_data)
         
-        # 生成存储路径（使用MD5作为文件名，缩短路径长度）
+        # 生成带时间戳的文件名（MD5_时间戳）
+        filename_with_timestamp = f"{md5_hash}_{timestamp}"
+        
+        # 生成存储路径（使用MD5+时间戳作为文件名）
         storage_path = generate_storage_path(
             file.filename or "image",
             storage.path_rule,
-            md5_hash=md5_hash
+            md5_hash=filename_with_timestamp
         )
         
         try:
@@ -135,10 +130,10 @@ class ImageService:
             thumbnail_height = await config_cache.get_thumbnail_height()
             thumbnail_save_path_config = await config_cache.get_thumbnail_save_path()
             
-            # 生成缩略图本地保存路径（带webp扩展名）
+            # 生成缩略图本地保存路径（使用带时间戳的文件名）
             from datetime import datetime
             date_path = datetime.now().strftime("%Y%m%d")
-            thumbnail_filename = f"{md5_hash}.{thumbnail_width}x{thumbnail_height}.webp"
+            thumbnail_filename = f"{filename_with_timestamp}.{thumbnail_width}x{thumbnail_height}.webp"
             thumbnail_save_path = f"{thumbnail_save_path_config}/{date_path}/{thumbnail_filename}"
             
             # 生成缩略图并保存到本地
@@ -155,7 +150,7 @@ class ImageService:
                 thumbnail_path = f"thumbnails/{date_path}/{thumbnail_filename}"
             else:
                 # 如果保存为jpg，更新文件名
-                thumbnail_path = f"thumbnails/{date_path}/{md5_hash}.{thumbnail_width}x{thumbnail_height}.{thumbnail_ext}"
+                thumbnail_path = f"thumbnails/{date_path}/{filename_with_timestamp}.{thumbnail_width}x{thumbnail_height}.{thumbnail_ext}"
         except Exception as e:
             # 缩略图生成失败不影响主图
             print(f"缩略图生成失败: {str(e)}")
