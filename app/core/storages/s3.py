@@ -11,7 +11,7 @@ class S3Storage(StorageBase):
     
     def __init__(self, config: dict):
         super().__init__(config)
-        self.endpoint_url = config.get("endpoint_url")  # S3兼容服务端点（如MinIO、R2）
+        self.endpoint_url = config.get("endpoint")  # S3兼容服务端点（如MinIO、R2）
         self.access_key_id = config.get("access_key_id") or config.get("aws_access_key_id")
         self.secret_access_key = config.get("secret_access_key") or config.get("aws_secret_access_key")
         self.region_name = config.get("region_name", "us-east-1")
