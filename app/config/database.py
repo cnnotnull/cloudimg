@@ -1,4 +1,6 @@
 from typing import AsyncGenerator
+import os
+from pathlib import Path
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from app.config.settings import settings
@@ -14,6 +16,21 @@ def create_database_engine():
         # 对于SQLite，需要特殊处理
         if "+aiosqlite" not in database_url:
             database_url = database_url.replace("sqlite://", "sqlite+aiosqlite://")
+        
+        # 确保数据库文件的父文件夹存在
+        # 从URL中提取文件路径
+        db_path = database_url.replace("sqlite+aiosqlite:///", "")
+        # 解码URL编码
+        from urllib.parse import unquote
+        db_path = unquote(db_path)
+        # 确保路径是绝对路径
+        db_path = os.path.abspath(db_path)
+        # 创建父文件夹
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"[DB]    数据库目录已创建: {db_dir}")
+        
         connect_args = {"check_same_thread": False}
         # SQLite 使用 NullPool 或 StaticPool（单线程应用）
         return create_async_engine(

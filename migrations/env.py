@@ -1,6 +1,7 @@
 from logging.config import fileConfig
 import sys
 import os
+from urllib.parse import unquote
 
 from sqlalchemy import pool
 from sqlalchemy import create_engine
@@ -72,6 +73,19 @@ def run_migrations_online() -> None:
     # 将异步URL转换为同步URL
     if "sqlite+aiosqlite" in database_url:
         sync_url = database_url.replace("sqlite+aiosqlite://", "sqlite://")
+        
+        # 确保SQLite数据库文件的父文件夹存在
+        db_path = sync_url.replace("sqlite:///", "")
+        # 解码URL编码
+        db_path = unquote(db_path)
+        # 确保路径是绝对路径
+        db_path = os.path.abspath(db_path)
+        # 创建父文件夹
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"[Alembic] 数据库目录已创建: {db_dir}")
+            
     elif "mysql+aiomysql" in database_url:
         sync_url = database_url.replace("mysql+aiomysql://", "mysql+pymysql://")
     elif "postgresql+asyncpg" in database_url:
