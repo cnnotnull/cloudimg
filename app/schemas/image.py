@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 
 class ImageBase(BaseModel):
@@ -24,6 +24,16 @@ class ImageResponse(ImageBase):
     thumbnail_url: Optional[str] = Field(None, description="缩略图URL")
     is_deleted: bool = Field(..., description="是否已删除")
     created_at: datetime = Field(..., description="创建时间")
+    
+    @field_serializer('created_at')
+    def serialize_created_at(self, value: datetime) -> str:
+        """序列化创建时间，转换为本地时区"""
+        if value.tzinfo is None:
+            # 如果没有时区信息，假设是UTC
+            value = value.replace(tzinfo=timezone.utc)
+        # 转换为上海时区 (UTC+8)
+        shanghai_time = value + timedelta(hours=8)
+        return shanghai_time.replace(tzinfo=None).isoformat() + "+08:00"
     
     class Config:
         from_attributes = True

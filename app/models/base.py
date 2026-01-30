@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional, Set
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import DeclarativeBase
 
 
@@ -22,10 +22,13 @@ class Base(DeclarativeBase):
         for column in self.__table__.columns:
             if column.name not in exclude:
                 value = getattr(self, column.name)
-                # 处理 datetime 对象
+                # 处理 datetime 对象，转换为本地时区
                 if isinstance(value, datetime):
-                    value = value.isoformat()
-                result[column.name] = value
+                    # 转换为上海时区 (UTC+8)
+                    shanghai_time = value + timedelta(hours=8)
+                    result[column.name] = shanghai_time.replace(tzinfo=None).isoformat() + "+08:00"
+                else:
+                    result[column.name] = value
         
         return result
     

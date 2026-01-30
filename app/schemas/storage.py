@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, field_serializer
 
 
 class StorageEngineBase(BaseModel):
@@ -36,6 +36,15 @@ class StorageEngineResponse(StorageEngineBase):
     used_capacity: int
     created_at: datetime
     updated_at: Optional[datetime]
+    
+    @field_serializer('created_at', 'updated_at')
+    def serialize_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        """序列化时间字段，转换为本地时区"""
+        if value is None:
+            return None
+        # 转换为上海时区 (UTC+8)
+        shanghai_time = value + timedelta(hours=8)
+        return shanghai_time.replace(tzinfo=None).isoformat() + "+08:00"
     
     class Config:
         from_attributes = True
