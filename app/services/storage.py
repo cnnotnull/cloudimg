@@ -73,12 +73,26 @@ class StorageService:
         )
         
         db.add(storage)
-        await db.commit()
+        
+        # 刷新以获取生成的ID（用于缓存）
+        await db.flush()
         await db.refresh(storage)
         
-        # 添加到缓存
+        # 添加到缓存（如果失败，数据库事务会回滚）
         if storage.is_active:
-            storage_cache.add_storage(storage)
+            try:
+                storage_cache.add_storage(storage)
+            except Exception as e:
+                # 缓存添加失败，抛出异常让数据库事务回滚
+                raise AppException(
+                    status_code=400,
+                    detail=f"创建存储实例失败: {str(e)}",
+                    error_code="STORAGE_INSTANCE_CREATE_FAILED"
+                )
+        
+        # 提交数据库事务
+        await db.commit()
+        await db.refresh(storage)
         
         return storage
     
