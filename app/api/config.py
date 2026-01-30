@@ -15,6 +15,7 @@ from app.schemas.config import (
 from app.schemas.response import BaseResponse
 from app.core.config_cache import config_cache
 from app.core.exceptions import AppException
+from app.core.auth import get_current_user
 
 
 router = APIRouter(prefix="/config", tags=["系统配置"])
@@ -22,7 +23,8 @@ router = APIRouter(prefix="/config", tags=["系统配置"])
 
 @router.get("", response_model=BaseResponse)
 async def get_all_configs(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取所有系统配置"""
     configs = await ConfigService.get_all(db)
@@ -32,7 +34,8 @@ async def get_all_configs(
 @router.put("/batch", response_model=BaseResponse)
 async def batch_update_configs(
     update: SystemConfigBatchUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """批量更新配置"""
     await ConfigService.update_multiple(db, update.configs)
@@ -46,7 +49,8 @@ async def batch_update_configs(
 @router.get("/{key}", response_model=BaseResponse)
 async def get_config(
     key: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取指定配置"""
     value = await ConfigService.get(db, key)
@@ -63,7 +67,8 @@ async def get_config(
 async def update_config(
     key: str,
     update: SystemConfigUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """更新指定配置"""
     config = await ConfigService.set(db, key, update.value)
@@ -79,7 +84,8 @@ async def update_config(
 
 @router.get("/settings", response_model=BaseResponse)
 async def get_settings(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取系统设置（结构化的配置）"""
     # 从缓存获取配置
@@ -97,7 +103,8 @@ async def get_settings(
 @router.put("/settings", response_model=BaseResponse)
 async def update_settings(
     settings_update: SystemSettings,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """更新系统设置"""
     # 转换为配置字典
@@ -121,7 +128,8 @@ async def update_settings(
 @router.delete("/{key}", response_model=BaseResponse)
 async def delete_config(
     key: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """删除指定配置"""
     success = await ConfigService.delete(db, key)
@@ -140,7 +148,8 @@ async def delete_config(
 
 @router.post("/reload", response_model=BaseResponse)
 async def reload_configs(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """重新加载配置（从数据库）"""
     await config_cache.reload_from_db(db)

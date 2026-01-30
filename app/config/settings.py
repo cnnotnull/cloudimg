@@ -33,8 +33,14 @@ class Settings(BaseSettings):
     
     # 安全配置
     SECRET_KEY: str = "EDcOlV9UZD5KNl2Y0dzA9wBZ2YZvxUzH"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # Session配置
+    SESSION_EXPIRE_MINUTES: int = 30  # 默认session过期时间（分钟）
+    SESSION_REMEMBER_DAYS: int = 7   # 记住我功能过期时间（天）
+    
+    # 管理员账号配置
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin"
 
     
     class Config:

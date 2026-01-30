@@ -11,6 +11,7 @@ from app.schemas.response import BaseResponse
 from app.core.exceptions import AppException, ERROR_CODES
 from app.config.settings import settings
 from app.core.config_cache import config_cache
+from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/images", tags=["图片管理"])
 
@@ -20,7 +21,8 @@ async def upload_image(
     file: UploadFile = File(...),
     storage_engine_id: Optional[int] = Query(None, description="存储引擎ID，不指定则使用默认"),
     request: Request = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """上传单张图片"""
     try:
@@ -86,7 +88,8 @@ async def upload_images_batch(
     files: List[UploadFile] = File(...),
     storage_engine_id: Optional[int] = Query(None, description="存储引擎ID，不指定则使用默认"),
     request: Request = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """批量上传图片"""
     upload_ip = None
@@ -161,7 +164,8 @@ async def get_images(
     storage_engine_id: Optional[int] = Query(None, description="存储引擎ID，为空则返回默认存储引擎的数据"),
     file_type: Optional[str] = Query(None, description="文件类型"),
     is_deleted: Optional[bool] = Query(None, description="是否已删除"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     获取图片列表
@@ -261,7 +265,8 @@ async def get_images(
 @router.get("/{image_id}", response_model=BaseResponse)
 async def get_image(
     image_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取图片详情"""
     image = await ImageService.get_by_id(db, image_id)
@@ -321,7 +326,8 @@ async def get_image(
 async def delete_image(
     image_id: int,
     hard_delete: bool = Query(False, description="是否硬删除（物理删除文件）"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """删除图片"""
     try:
@@ -348,7 +354,8 @@ async def delete_image(
 async def batch_delete_images(
     image_ids: List[int],
     hard_delete: bool = Query(False, description="是否硬删除（物理删除文件）"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """批量删除图片"""
     try:
@@ -365,7 +372,8 @@ async def batch_delete_images(
 @router.get("/{image_id}/info", response_model=BaseResponse)
 async def get_image_info(
     image_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取图片信息"""
     image = await ImageService.get_by_id(db, image_id)

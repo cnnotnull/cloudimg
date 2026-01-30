@@ -14,6 +14,7 @@ from app.schemas.storage import (
 from app.schemas.response import BaseResponse, ResponseMessages
 from app.core.exceptions import AppException, ERROR_CODES
 from app.core.storage_cache import storage_cache
+from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/storage/engines", tags=["存储引擎"])
 
@@ -23,7 +24,8 @@ async def get_storage_engines(
     skip: int = Query(0, ge=0, description="跳过数量"),
     limit: int = Query(100, ge=1, le=1000, description="返回数量"),
     is_active: Optional[bool] = Query(None, description="是否激活"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取存储引擎列表"""
     storages = await StorageService.get_all(db, skip=skip, limit=limit, is_active=is_active)
@@ -35,7 +37,8 @@ async def get_storage_engines(
 @router.post("", response_model=BaseResponse, status_code=201)
 async def create_storage_engine(
     storage_data: StorageEngineCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """创建存储引擎"""
     try:
@@ -54,7 +57,8 @@ async def create_storage_engine(
 @router.get("/{storage_id}", response_model=BaseResponse)
 async def get_storage_engine(
     storage_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取存储引擎详情"""
     storage = await StorageService.get_by_id(db, storage_id)
@@ -74,7 +78,8 @@ async def get_storage_engine(
 async def update_storage_engine(
     storage_id: int,
     storage_data: StorageEngineUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """更新存储引擎"""
     update_data = storage_data.model_dump(exclude_unset=True)
@@ -95,7 +100,8 @@ async def update_storage_engine(
 @router.delete("/{storage_id}", response_model=BaseResponse)
 async def delete_storage_engine(
     storage_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """删除存储引擎"""
     try:
@@ -121,7 +127,8 @@ async def delete_storage_engine(
 @router.post("/{storage_id}/test", response_model=BaseResponse)
 async def test_storage_engine(
     storage_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """测试存储引擎连接"""
     # 从缓存获取存储实例
@@ -163,7 +170,8 @@ async def test_storage_engine(
 @router.put("/{storage_id}/default", response_model=BaseResponse)
 async def set_default_storage_engine(
     storage_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """设置默认存储引擎"""
     try:
@@ -191,7 +199,8 @@ async def set_default_storage_engine(
 @router.get("/{storage_id}/usage", response_model=BaseResponse)
 async def get_storage_usage(
     storage_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """获取存储引擎使用情况"""
     # 从缓存获取存储引擎配置
