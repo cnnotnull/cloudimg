@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     ALLOWED_IMAGE_TYPES: list[str] = ["image/jpeg", "image/png", "image/gif", "image/webp"]
     UPLOAD_DIR: str = "./uploads"
     
+    # 缩略图配置
+    THUMBNAIL_WIDTH: int = 300  # 缩略图宽度
+    THUMBNAIL_HEIGHT: int = 300  # 缩略图高度
+    THUMBNAIL_SAVE_PATH: str = "./thumbnails"  # 缩略图本地保存路径
+    THUMBNAIL_URL_PREFIX: str = "http://localhost:8000"  # 缩略图URL前缀
+    
     # 安全配置
     SECRET_KEY: str = "EDcOlV9UZD5KNl2Y0dzA9wBZ2YZvxUzH"
     ALGORITHM: str = "HS256"

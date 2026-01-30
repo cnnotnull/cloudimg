@@ -9,6 +9,7 @@ from app.services.storage import StorageService
 from app.schemas.image import ImageResponse, ImageUploadResponse, ImageListQuery
 from app.schemas.response import BaseResponse
 from app.core.exceptions import AppException, ERROR_CODES
+from app.config.settings import settings
 
 router = APIRouter(prefix="/images", tags=["图片管理"])
 
@@ -34,6 +35,11 @@ async def upload_image(
             upload_ip=upload_ip
         )
         
+        # 拼接缩略图URL前缀（包含/thumbnails路径）
+        thumbnail_url = image.thumbnail_url
+        if thumbnail_url and settings.THUMBNAIL_URL_PREFIX:
+            thumbnail_url = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{thumbnail_url}"
+        
         return BaseResponse.upload_response(
             data=ImageUploadResponse(
                 id=image.id,
@@ -41,7 +47,7 @@ async def upload_image(
                 sha256=image.sha256,
                 filename=image.original_filename,
                 url=image.original_url,
-                thumbnail_url=image.thumbnail_url,
+                thumbnail_url=thumbnail_url,
                 size=image.file_size,
                 width=image.width,
                 height=image.height
@@ -80,13 +86,17 @@ async def upload_images_batch(
                 storage_engine_id=storage_engine_id,
                 upload_ip=upload_ip
             )
+            # 拼接缩略图URL前缀（包含/thumbnails路径）
+            thumbnail_url = image.thumbnail_url
+            if thumbnail_url and settings.THUMBNAIL_URL_PREFIX:
+                thumbnail_url = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{thumbnail_url}"
             results.append(ImageUploadResponse(
                 id=image.id,
                 md5=image.md5,
                 sha256=image.sha256,
                 filename=image.original_filename,
                 url=image.original_url,
-                thumbnail_url=image.thumbnail_url,
+                thumbnail_url=thumbnail_url,
                 size=image.file_size,
                 width=image.width,
                 height=image.height
@@ -158,8 +168,34 @@ async def get_images(
     
     page = (skip // limit) + 1 if limit > 0 else 1
     
+    # 处理缩略图URL
+    processed_images = []
+    for img in images:
+        # SQLAlchemy模型转换为字典
+        img_dict = {
+            "id": img.id,
+            "md5": img.md5,
+            "sha256": img.sha256,
+            "original_filename": img.original_filename,
+            "storage_filename": img.storage_filename,
+            "storage_engine_id": img.storage_engine_id,
+            "file_size": img.file_size,
+            "file_type": img.file_type,
+            "width": img.width,
+            "height": img.height,
+            "upload_ip": img.upload_ip,
+            "original_url": img.original_url,
+            "thumbnail_url": img.thumbnail_url,
+            "extra_metadata": img.extra_metadata,
+            "is_deleted": img.is_deleted,
+            "created_at": img.created_at
+        }
+        if img_dict.get("thumbnail_url") and settings.THUMBNAIL_URL_PREFIX:
+            img_dict["thumbnail_url"] = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{img_dict['thumbnail_url']}"
+        processed_images.append(ImageResponse.model_validate(img_dict))
+    
     return BaseResponse.paginated_response(
-        items=[ImageResponse.model_validate(img) for img in images],
+        items=processed_images,
         total=total,
         page=page,
         per_page=limit
@@ -180,8 +216,30 @@ async def get_image(
             error_code=ERROR_CODES["IMAGE_NOT_FOUND"]
         )
     
+    # 处理缩略图URL - SQLAlchemy模型转换为字典
+    img_dict = {
+        "id": image.id,
+        "md5": image.md5,
+        "sha256": image.sha256,
+        "original_filename": image.original_filename,
+        "storage_filename": image.storage_filename,
+        "storage_engine_id": image.storage_engine_id,
+        "file_size": image.file_size,
+        "file_type": image.file_type,
+        "width": image.width,
+        "height": image.height,
+        "upload_ip": image.upload_ip,
+        "original_url": image.original_url,
+        "thumbnail_url": image.thumbnail_url,
+        "extra_metadata": image.extra_metadata,
+        "is_deleted": image.is_deleted,
+        "created_at": image.created_at
+    }
+    if img_dict.get("thumbnail_url") and settings.THUMBNAIL_URL_PREFIX:
+        img_dict["thumbnail_url"] = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{img_dict['thumbnail_url']}"
+    
     return BaseResponse.success_response(
-        data=ImageResponse.model_validate(image)
+        data=ImageResponse.model_validate(img_dict)
     )
 
 
@@ -244,6 +302,28 @@ async def get_image_info(
             error_code=ERROR_CODES["IMAGE_NOT_FOUND"]
         )
     
+    # 处理缩略图URL - SQLAlchemy模型转换为字典
+    img_dict = {
+        "id": image.id,
+        "md5": image.md5,
+        "sha256": image.sha256,
+        "original_filename": image.original_filename,
+        "storage_filename": image.storage_filename,
+        "storage_engine_id": image.storage_engine_id,
+        "file_size": image.file_size,
+        "file_type": image.file_type,
+        "width": image.width,
+        "height": image.height,
+        "upload_ip": image.upload_ip,
+        "original_url": image.original_url,
+        "thumbnail_url": image.thumbnail_url,
+        "extra_metadata": image.extra_metadata,
+        "is_deleted": image.is_deleted,
+        "created_at": image.created_at
+    }
+    if img_dict.get("thumbnail_url") and settings.THUMBNAIL_URL_PREFIX:
+        img_dict["thumbnail_url"] = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/{img_dict['thumbnail_url']}"
+    
     return BaseResponse.success_response(
-        data=ImageResponse.model_validate(image)
+        data=ImageResponse.model_validate(img_dict)
     )

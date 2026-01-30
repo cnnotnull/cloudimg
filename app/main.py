@@ -147,13 +147,19 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(storage_router, prefix=settings.API_V1_STR)
 app.include_router(image_router, prefix=settings.API_V1_STR)
 
-# 挂载本地图片上传根路径
+# 挂载本地图片上传根路径和缩略图目录
 import os
 
 upload_dir = settings.UPLOAD_DIR
 if not os.path.exists(upload_dir):
     os.makedirs(upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
+
+# 挂载缩略图目录
+thumbnail_dir = settings.THUMBNAIL_SAVE_PATH
+if not os.path.exists(thumbnail_dir):
+    os.makedirs(thumbnail_dir, exist_ok=True)
+app.mount("/thumbnails", StaticFiles(directory=thumbnail_dir), name="thumbnails")
 
 
 # ==================== 基础端点 ====================

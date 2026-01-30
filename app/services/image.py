@@ -10,6 +10,7 @@ from app.core.storage_cache import storage_cache
 from app.core.storages.factory import StorageFactory
 from app.utils.file import calculate_md5, calculate_sha256, validate_image_file, get_image_info
 from app.utils.path import generate_storage_path
+from app.utils.thumbnail import generate_thumbnail, get_thumbnail_dimensions
 from app.core.exceptions import AppException, ERROR_CODES
 from app.config.settings import settings
 
@@ -124,6 +125,34 @@ class ImageService:
                 error_code=ERROR_CODES["IMAGE_UPLOAD_FAILED"]
             )
         
+        # 处理缩略图（保存到本地）
+        thumbnail_path = None
+        try:
+            # 生成缩略图本地保存路径（带webp扩展名）
+            from datetime import datetime
+            date_path = datetime.now().strftime("%Y%m%d")
+            thumbnail_filename = f"{md5_hash}.{settings.THUMBNAIL_WIDTH}x{settings.THUMBNAIL_HEIGHT}.webp"
+            thumbnail_save_path = f"{settings.THUMBNAIL_SAVE_PATH}/{date_path}/{thumbnail_filename}"
+            print(f"thumbnail_save_path: {thumbnail_save_path}")
+            # 生成缩略图并保存到本地
+            thumbnail_ext = generate_thumbnail(
+                file_data,
+                thumbnail_save_path,
+                width=settings.THUMBNAIL_WIDTH,
+                height=settings.THUMBNAIL_HEIGHT
+            )
+            
+            # 存储相对路径到数据库（使用实际的扩展名）
+            if thumbnail_ext == 'webp':
+                thumbnail_path = f"{date_path}/{thumbnail_filename}"
+            else:
+                # 如果保存为jpg，更新文件名
+                thumbnail_path = f"{date_path}/{md5_hash}.{settings.THUMBNAIL_WIDTH}x{settings.THUMBNAIL_HEIGHT}.{thumbnail_ext}"
+        except Exception as e:
+            # 缩略图生成失败不影响主图
+            print(f"缩略图生成失败: {str(e)}")
+            thumbnail_path = None
+        
         # 创建新记录（使用自增ID）
         image = Image(
             md5=md5_hash,
@@ -137,6 +166,7 @@ class ImageService:
             height=image_info.get("height"),
             upload_ip=upload_ip,
             original_url=original_url,
+            thumbnail_url=thumbnail_path,
             extra_metadata=image_info
         )
         db.add(image)
