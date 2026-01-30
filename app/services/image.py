@@ -108,11 +108,11 @@ class ImageService:
         # 获取图片信息
         image_info = get_image_info(file_data)
         
-        # 生成存储路径（使用SHA256作为文件名，避免文件名冲突和特殊字符问题）
+        # 生成存储路径（使用MD5作为文件名，缩短路径长度）
         storage_path = generate_storage_path(
             file.filename or "image",
             storage.path_rule,
-            sha256_hash=sha256_hash
+            md5_hash=md5_hash
         )
         
         try:
