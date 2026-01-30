@@ -25,10 +25,9 @@ async def lifespan(app: FastAPI):
     print(f"[INFO]  API文档: http://{settings.HOST}:{settings.PORT}/docs")
     print("=" * 50)
 
-    # 初始化数据库（开发环境）
-    if settings.DEBUG:
-        await init_db()
-        print("[OK]    数据库初始化完成")
+    # 注意：数据库迁移已迁移到alembic管理
+    # 首次部署前请运行: alembic upgrade head
+    # 开发环境也可以运行: alembic revision --autogenerate -m "描述"
 
     # 初始化系统配置
     from app.config.database import get_db
