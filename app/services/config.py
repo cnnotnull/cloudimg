@@ -17,16 +17,13 @@ class ConfigService:
         # 文件上传配置
         "max_upload_size": "10485760",  # 10MB
         "allowed_image_types": "image/jpeg,image/png,image/gif,image/webp",
-        "upload_dir": "./uploads",
         
         # 缩略图配置
         "thumbnail_width": "300",
         "thumbnail_height": "300",
-        "thumbnail_save_path": "./thumbnails",
-        "thumbnail_url_prefix": "http://localhost:8000",
         
-        # 其他配置
-        "default_storage_engine_id": "",  # 默认存储引擎ID，空字符串表示未设置
+        # 系统访问域名
+        "system_domain": "http://localhost:8000",
     }
     
     @staticmethod

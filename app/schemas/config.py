@@ -34,13 +34,10 @@ class SystemSettings(BaseModel):
     # 文件上传配置
     max_upload_size: int = Field(default=10 * 1024 * 1024, description="最大上传大小（字节）")
     allowed_image_types: str = Field(default="image/jpeg,image/png,image/gif,image/webp", description="允许的图片类型")
-    upload_dir: str = Field(default="./uploads", description="上传目录")
     
     # 缩略图配置
     thumbnail_width: int = Field(default=300, description="缩略图宽度")
     thumbnail_height: int = Field(default=300, description="缩略图高度")
-    thumbnail_save_path: str = Field(default="./thumbnails", description="缩略图保存路径")
-    thumbnail_url_prefix: str = Field(default="http://localhost:8000", description="缩略图URL前缀")
     
-    # 其他配置
-    default_storage_engine_id: Optional[int] = Field(default=None, description="默认存储引擎ID")
+    # 系统配置
+    system_domain: str = Field(default="http://localhost:8000", description="系统访问域名")

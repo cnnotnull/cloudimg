@@ -76,6 +76,48 @@ async def update_config(
         data=SystemConfigResponse.model_validate(config)
     )
 
+
+@router.get("/settings", response_model=BaseResponse)
+async def get_settings(
+    db: AsyncSession = Depends(get_db)
+):
+    """获取系统设置（结构化的配置）"""
+    # 从缓存获取配置
+    settings_data = SystemSettings(
+        max_upload_size=await config_cache.get_max_upload_size(),
+        allowed_image_types=await config_cache.get_allowed_image_types(),
+        thumbnail_width=await config_cache.get_thumbnail_width(),
+        thumbnail_height=await config_cache.get_thumbnail_height(),
+        system_domain=await config_cache.get_system_domain()
+    )
+    
+    return BaseResponse.success_response(data=settings_data)
+
+
+@router.put("/settings", response_model=BaseResponse)
+async def update_settings(
+    settings_update: SystemSettings,
+    db: AsyncSession = Depends(get_db)
+):
+    """更新系统设置"""
+    # 转换为配置字典
+    configs = {
+        "max_upload_size": str(settings_update.max_upload_size),
+        "allowed_image_types": settings_update.allowed_image_types,
+        "thumbnail_width": str(settings_update.thumbnail_width),
+        "thumbnail_height": str(settings_update.thumbnail_height),
+        "system_domain": settings_update.system_domain,
+    }
+    
+    # 更新数据库
+    await ConfigService.update_multiple(db, configs)
+    
+    # 更新缓存
+    await config_cache.update(configs)
+    
+    return BaseResponse.success_response(message="系统设置更新成功")
+
+
 @router.delete("/{key}", response_model=BaseResponse)
 async def delete_config(
     key: str,

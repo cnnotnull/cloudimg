@@ -116,10 +116,6 @@ class ConfigCache:
         """获取允许的图片类型"""
         return await self.get("allowed_image_types", "image/jpeg,image/png,image/gif,image/webp")
     
-    async def get_upload_dir(self) -> str:
-        """获取上传目录"""
-        return await self.get("upload_dir", "./uploads")
-    
     async def get_thumbnail_width(self) -> int:
         """获取缩略图宽度"""
         return await self.get_int("thumbnail_width", 300)
@@ -128,18 +124,9 @@ class ConfigCache:
         """获取缩略图高度"""
         return await self.get_int("thumbnail_height", 300)
     
-    async def get_thumbnail_save_path(self) -> str:
-        """获取缩略图保存路径"""
-        return await self.get("thumbnail_save_path", "./thumbnails")
-    
-    async def get_thumbnail_url_prefix(self) -> str:
-        """获取缩略图URL前缀"""
-        return await self.get("thumbnail_url_prefix", "http://localhost:8000")
-    
-    async def get_default_storage_engine_id(self) -> Optional[int]:
-        """获取默认存储引擎ID"""
-        value = await self.get("default_storage_engine_id", "")
-        return int(value) if value else None
+    async def get_system_domain(self) -> str:
+        """获取系统访问域名"""
+        return await self.get("system_domain", "http://localhost:8000")
 
 
 # 创建全局配置缓存实例
