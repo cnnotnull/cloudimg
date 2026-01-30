@@ -128,13 +128,13 @@ class ImageService:
             # 从缓存获取缩略图配置
             thumbnail_width = await config_cache.get_thumbnail_width()
             thumbnail_height = await config_cache.get_thumbnail_height()
-            thumbnail_save_path_config = await config_cache.get_thumbnail_save_path()
             
             # 生成缩略图本地保存路径（使用带时间戳的文件名）
             from datetime import datetime
             date_path = datetime.now().strftime("%Y%m%d")
             thumbnail_filename = f"{filename_with_timestamp}.{thumbnail_width}x{thumbnail_height}.webp"
-            thumbnail_save_path = f"{thumbnail_save_path_config}/{date_path}/{thumbnail_filename}"
+            # 使用settings中的THUMBNAIL_SAVE_PATH
+            thumbnail_save_path = f"{settings.THUMBNAIL_SAVE_PATH}/{date_path}/{thumbnail_filename}"
             
             # 生成缩略图并保存到本地
             thumbnail_ext = generate_thumbnail(

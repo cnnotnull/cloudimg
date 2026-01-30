@@ -36,12 +36,27 @@ async def upload_image(
             upload_ip=upload_ip
         )
         
-        # 拼接缩略图URL前缀
-        # 数据库中已包含thumbnails目录，直接拼接即可
+        # 获取存储引擎信息
+        storage = await StorageService.get_by_id(db, image.storage_engine_id)
+        
+        # 拼接缩略图URL：缩略图总是本地存储，始终使用system_domain
+        system_domain = await config_cache.get_system_domain()
         thumbnail_url = image.thumbnail_url
-        thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
-        if thumbnail_url and thumbnail_url_prefix:
-            thumbnail_url = f"{thumbnail_url_prefix.rstrip('/')}/{thumbnail_url}"
+        if thumbnail_url and system_domain:
+            thumbnail_url = f"{system_domain.rstrip('/')}/{thumbnail_url}"
+        
+        # 拼接原图URL：根据存储引擎类型
+        original_url = image.original_url
+        if storage and storage.type == "local":
+            # 本地存储：system_domain + settings.UPLOAD_DIR + base_path + storage_filename
+            base_path = storage.config.get("base_path", "")
+            upload_path = settings.UPLOAD_DIR.lstrip('./').lstrip('/')
+            if image.storage_filename:
+                if base_path:
+                    original_url = f"{system_domain.rstrip('/')}/{upload_path}/{base_path.lstrip('/')}/{image.storage_filename.lstrip('/')}"
+                else:
+                    original_url = f"{system_domain.rstrip('/')}/{upload_path}/{image.storage_filename.lstrip('/')}"
+        # S3等云存储：直接使用存储引擎返回的original_url
         
         return BaseResponse.upload_response(
             data=ImageUploadResponse(
@@ -89,18 +104,35 @@ async def upload_images_batch(
                 storage_engine_id=storage_engine_id,
                 upload_ip=upload_ip
             )
-            # 拼接缩略图URL前缀
-            # 数据库中已包含thumbnails目录，直接拼接即可
+            
+            # 获取存储引擎信息
+            storage = await StorageService.get_by_id(db, image.storage_engine_id)
+            
+            # 拼接缩略图URL：缩略图总是本地存储，始终使用system_domain
+            system_domain = await config_cache.get_system_domain()
             thumbnail_url = image.thumbnail_url
-            thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
-            if thumbnail_url and thumbnail_url_prefix:
-                thumbnail_url = f"{thumbnail_url_prefix.rstrip('/')}/{thumbnail_url}"
+            if thumbnail_url and system_domain:
+                thumbnail_url = f"{system_domain.rstrip('/')}/{thumbnail_url}"
+            
+            # 拼接原图URL：根据存储引擎类型
+            original_url = image.original_url
+            if storage and storage.type == "local":
+                # 本地存储：system_domain + settings.UPLOAD_DIR + base_path + storage_filename
+                base_path = storage.config.get("base_path", "")
+                upload_path = settings.UPLOAD_DIR.lstrip('./').lstrip('/')
+                if image.storage_filename:
+                    if base_path:
+                        original_url = f"{system_domain.rstrip('/')}/{upload_path}/{base_path.lstrip('/')}/{image.storage_filename.lstrip('/')}"
+                    else:
+                        original_url = f"{system_domain.rstrip('/')}/{upload_path}/{image.storage_filename.lstrip('/')}"
+            # S3等云存储：直接使用存储引擎返回的original_url
+            
             results.append(ImageUploadResponse(
                 id=image.id,
                 md5=image.md5,
                 sha256=image.sha256,
                 filename=image.original_filename,
-                url=image.original_url,
+                url=original_url,
                 thumbnail_url=thumbnail_url,
                 size=image.file_size,
                 width=image.width,
@@ -173,9 +205,13 @@ async def get_images(
     
     page = (skip // limit) + 1 if limit > 0 else 1
     
-    # 处理缩略图URL
+    # 处理URL
+    system_domain = await config_cache.get_system_domain()
     processed_images = []
     for img in images:
+        # 获取存储引擎信息
+        storage = await StorageService.get_by_id(db, img.storage_engine_id)
+        
         # SQLAlchemy模型转换为字典
         img_dict = {
             "id": img.id,
@@ -195,10 +231,23 @@ async def get_images(
             "is_deleted": img.is_deleted,
             "created_at": img.created_at
         }
-        thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
-        # 数据库中已包含thumbnails目录，直接拼接即可
-        if img_dict.get("thumbnail_url") and thumbnail_url_prefix:
-            img_dict["thumbnail_url"] = f"{thumbnail_url_prefix.rstrip('/')}/{img_dict['thumbnail_url']}"
+        
+        # 拼接缩略图URL：缩略图总是本地存储，始终使用system_domain
+        if img_dict.get("thumbnail_url") and system_domain:
+            img_dict["thumbnail_url"] = f"{system_domain.rstrip('/')}/{img_dict['thumbnail_url']}"
+        
+        # 拼接原图URL：根据存储引擎类型
+        if storage and storage.type == "local":
+            # 本地存储：system_domain + settings.UPLOAD_DIR + base_path + storage_filename
+            base_path = storage.config.get("base_path", "")
+            upload_path = settings.UPLOAD_DIR.lstrip('./').lstrip('/')
+            if img_dict.get("storage_filename"):
+                if base_path:
+                    img_dict["original_url"] = f"{system_domain.rstrip('/')}/{upload_path}/{base_path.lstrip('/')}/{img_dict['storage_filename'].lstrip('/')}"
+                else:
+                    img_dict["original_url"] = f"{system_domain.rstrip('/')}/{upload_path}/{img_dict['storage_filename'].lstrip('/')}"
+        # S3等云存储：直接使用存储引擎返回的original_url
+        
         processed_images.append(ImageResponse.model_validate(img_dict))
     
     return BaseResponse.paginated_response(
@@ -223,7 +272,11 @@ async def get_image(
             error_code=ERROR_CODES["IMAGE_NOT_FOUND"]
         )
     
-    # 处理缩略图URL - SQLAlchemy模型转换为字典
+    # 获取存储引擎信息
+    storage = await StorageService.get_by_id(db, image.storage_engine_id)
+    
+    # 处理URL - SQLAlchemy模型转换为字典
+    system_domain = await config_cache.get_system_domain()
     img_dict = {
         "id": image.id,
         "md5": image.md5,
@@ -242,10 +295,22 @@ async def get_image(
         "is_deleted": image.is_deleted,
         "created_at": image.created_at
     }
-    thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
-    # 数据库中已包含thumbnails目录，直接拼接即可
-    if img_dict.get("thumbnail_url") and thumbnail_url_prefix:
-        img_dict["thumbnail_url"] = f"{thumbnail_url_prefix.rstrip('/')}/{img_dict['thumbnail_url']}"
+    
+    # 拼接缩略图URL：缩略图总是本地存储，始终使用system_domain
+    if img_dict.get("thumbnail_url") and system_domain:
+        img_dict["thumbnail_url"] = f"{system_domain.rstrip('/')}/{img_dict['thumbnail_url']}"
+    
+    # 拼接原图URL：根据存储引擎类型
+    if storage and storage.type == "local":
+        # 本地存储：system_domain + settings.UPLOAD_DIR + base_path + storage_filename
+        base_path = storage.config.get("base_path", "")
+        upload_path = settings.UPLOAD_DIR.lstrip('./').lstrip('/')
+        if img_dict.get("storage_filename"):
+            if base_path:
+                img_dict["original_url"] = f"{system_domain.rstrip('/')}/{upload_path}/{base_path.lstrip('/')}/{img_dict['storage_filename'].lstrip('/')}"
+            else:
+                img_dict["original_url"] = f"{system_domain.rstrip('/')}/{upload_path}/{img_dict['storage_filename'].lstrip('/')}"
+    # S3等云存储：直接使用存储引擎返回的original_url
     
     return BaseResponse.success_response(
         data=ImageResponse.model_validate(img_dict)
@@ -311,7 +376,11 @@ async def get_image_info(
             error_code=ERROR_CODES["IMAGE_NOT_FOUND"]
         )
     
-    # 处理缩略图URL - SQLAlchemy模型转换为字典
+    # 获取存储引擎信息
+    storage = await StorageService.get_by_id(db, image.storage_engine_id)
+    
+    # 处理URL - SQLAlchemy模型转换为字典
+    system_domain = await config_cache.get_system_domain()
     img_dict = {
         "id": image.id,
         "md5": image.md5,
@@ -330,10 +399,22 @@ async def get_image_info(
         "is_deleted": image.is_deleted,
         "created_at": image.created_at
     }
-    thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
-    # 数据库中已包含thumbnails目录，直接拼接即可
-    if img_dict.get("thumbnail_url") and thumbnail_url_prefix:
-        img_dict["thumbnail_url"] = f"{thumbnail_url_prefix.rstrip('/')}/{img_dict['thumbnail_url']}"
+    
+    # 拼接缩略图URL：缩略图总是本地存储，始终使用system_domain
+    if img_dict.get("thumbnail_url") and system_domain:
+        img_dict["thumbnail_url"] = f"{system_domain.rstrip('/')}/{img_dict['thumbnail_url']}"
+    
+    # 拼接原图URL：根据存储引擎类型
+    if storage and storage.type == "local":
+        # 本地存储：system_domain + settings.UPLOAD_DIR + base_path + storage_filename
+        base_path = storage.config.get("base_path", "")
+        upload_path = settings.UPLOAD_DIR.lstrip('./').lstrip('/')
+        if img_dict.get("storage_filename"):
+            if base_path:
+                img_dict["original_url"] = f"{system_domain.rstrip('/')}/{upload_path}/{base_path.lstrip('/')}/{img_dict['storage_filename'].lstrip('/')}"
+            else:
+                img_dict["original_url"] = f"{system_domain.rstrip('/')}/{upload_path}/{img_dict['storage_filename'].lstrip('/')}"
+    # S3等云存储：直接使用存储引擎返回的original_url
     
     return BaseResponse.success_response(
         data=ImageResponse.model_validate(img_dict)
