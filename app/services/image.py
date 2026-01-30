@@ -13,6 +13,7 @@ from app.utils.path import generate_storage_path
 from app.utils.thumbnail import generate_thumbnail, get_thumbnail_dimensions
 from app.core.exceptions import AppException, ERROR_CODES
 from app.config.settings import settings
+from app.core.config_cache import config_cache
 
 
 class ImageService:
@@ -50,10 +51,11 @@ class ImageService:
             )
         
         # 检查文件大小
-        if len(file_data) > settings.MAX_UPLOAD_SIZE:
+        max_size = await config_cache.get_max_upload_size()
+        if len(file_data) > max_size:
             raise AppException(
                 status_code=400,
-                detail=f"文件大小超过限制: {len(file_data)} > {settings.MAX_UPLOAD_SIZE}",
+                detail=f"文件大小超过限制: {len(file_data)} > {max_size}",
                 error_code=ERROR_CODES["IMAGE_TOO_LARGE"]
             )
         
@@ -128,26 +130,32 @@ class ImageService:
         # 处理缩略图（保存到本地）
         thumbnail_path = None
         try:
+            # 从缓存获取缩略图配置
+            thumbnail_width = await config_cache.get_thumbnail_width()
+            thumbnail_height = await config_cache.get_thumbnail_height()
+            thumbnail_save_path_config = await config_cache.get_thumbnail_save_path()
+            
             # 生成缩略图本地保存路径（带webp扩展名）
             from datetime import datetime
             date_path = datetime.now().strftime("%Y%m%d")
-            thumbnail_filename = f"{md5_hash}.{settings.THUMBNAIL_WIDTH}x{settings.THUMBNAIL_HEIGHT}.webp"
-            thumbnail_save_path = f"{settings.THUMBNAIL_SAVE_PATH}/{date_path}/{thumbnail_filename}"
-            print(f"thumbnail_save_path: {thumbnail_save_path}")
+            thumbnail_filename = f"{md5_hash}.{thumbnail_width}x{thumbnail_height}.webp"
+            thumbnail_save_path = f"{thumbnail_save_path_config}/{date_path}/{thumbnail_filename}"
+            
             # 生成缩略图并保存到本地
             thumbnail_ext = generate_thumbnail(
                 file_data,
                 thumbnail_save_path,
-                width=settings.THUMBNAIL_WIDTH,
-                height=settings.THUMBNAIL_HEIGHT
+                width=thumbnail_width,
+                height=thumbnail_height
             )
             
-            # 存储相对路径到数据库（使用实际的扩展名）
+            # 数据库中存储完整的相对路径（从thumbnails目录开始）
+            # 这样API拼接URL时就能正确访问：{url_prefix}/thumbnails/{thumbnail_path}
             if thumbnail_ext == 'webp':
-                thumbnail_path = f"{date_path}/{thumbnail_filename}"
+                thumbnail_path = f"thumbnails/{date_path}/{thumbnail_filename}"
             else:
                 # 如果保存为jpg，更新文件名
-                thumbnail_path = f"{date_path}/{md5_hash}.{settings.THUMBNAIL_WIDTH}x{settings.THUMBNAIL_HEIGHT}.{thumbnail_ext}"
+                thumbnail_path = f"thumbnails/{date_path}/{md5_hash}.{thumbnail_width}x{thumbnail_height}.{thumbnail_ext}"
         except Exception as e:
             # 缩略图生成失败不影响主图
             print(f"缩略图生成失败: {str(e)}")

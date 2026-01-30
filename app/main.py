@@ -8,10 +8,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.settings import settings
 from app.config.database import init_db, engine
-from app.api import storage_router, image_router
+from app.api import storage_router, image_router, config_router
 from app.core.exceptions import AppException, ERROR_CODES
 from app.schemas.response import BaseResponse, ResponseMessages
 from app.core.storage_cache import storage_cache
+from app.core.config_cache import config_cache
 
 
 @asynccontextmanager
@@ -29,12 +30,24 @@ async def lifespan(app: FastAPI):
         await init_db()
         print("[OK]    数据库初始化完成")
 
-    # 初始化存储引擎缓存
+    # 初始化系统配置
     from app.config.database import get_db
+    from app.services.config import ConfigService
     async for db in get_db():
+        # 初始化默认配置
+        count = await ConfigService.initialize_defaults(db)
+        if count > 0:
+            print(f"[OK]    初始化了 {count} 条默认配置")
+        
+        # 加载配置到缓存
+        configs = await ConfigService.get_all(db)
+        await config_cache.initialize(configs)
+        print("[OK]    系统配置缓存初始化完成")
+        
+        # 初始化存储引擎缓存
         await storage_cache.initialize(db)
+        print("[OK]    存储引擎缓存初始化完成")
         break
-    print("[OK]    存储引擎缓存初始化完成")
 
     yield
 
@@ -146,6 +159,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # 注册API路由
 app.include_router(storage_router, prefix=settings.API_V1_STR)
 app.include_router(image_router, prefix=settings.API_V1_STR)
+app.include_router(config_router, prefix=settings.API_V1_STR)
 
 # 挂载本地图片上传根路径和缩略图目录
 import os
@@ -155,7 +169,8 @@ if not os.path.exists(upload_dir):
     os.makedirs(upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
 
-# 挂载缩略图目录
+# 挂载缩略图目录（注意：这里仍然使用settings中的值作为默认值，
+# 实际路径可以通过配置API动态修改，需要重启服务生效）
 thumbnail_dir = settings.THUMBNAIL_SAVE_PATH
 if not os.path.exists(thumbnail_dir):
     os.makedirs(thumbnail_dir, exist_ok=True)

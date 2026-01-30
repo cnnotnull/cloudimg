@@ -10,6 +10,7 @@ from app.schemas.image import ImageResponse, ImageUploadResponse, ImageListQuery
 from app.schemas.response import BaseResponse
 from app.core.exceptions import AppException, ERROR_CODES
 from app.config.settings import settings
+from app.core.config_cache import config_cache
 
 router = APIRouter(prefix="/images", tags=["图片管理"])
 
@@ -35,10 +36,12 @@ async def upload_image(
             upload_ip=upload_ip
         )
         
-        # 拼接缩略图URL前缀（包含/thumbnails路径）
+        # 拼接缩略图URL前缀
+        # 数据库中已包含thumbnails目录，直接拼接即可
         thumbnail_url = image.thumbnail_url
-        if thumbnail_url and settings.THUMBNAIL_URL_PREFIX:
-            thumbnail_url = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{thumbnail_url}"
+        thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
+        if thumbnail_url and thumbnail_url_prefix:
+            thumbnail_url = f"{thumbnail_url_prefix.rstrip('/')}/{thumbnail_url}"
         
         return BaseResponse.upload_response(
             data=ImageUploadResponse(
@@ -86,10 +89,12 @@ async def upload_images_batch(
                 storage_engine_id=storage_engine_id,
                 upload_ip=upload_ip
             )
-            # 拼接缩略图URL前缀（包含/thumbnails路径）
+            # 拼接缩略图URL前缀
+            # 数据库中已包含thumbnails目录，直接拼接即可
             thumbnail_url = image.thumbnail_url
-            if thumbnail_url and settings.THUMBNAIL_URL_PREFIX:
-                thumbnail_url = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{thumbnail_url}"
+            thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
+            if thumbnail_url and thumbnail_url_prefix:
+                thumbnail_url = f"{thumbnail_url_prefix.rstrip('/')}/{thumbnail_url}"
             results.append(ImageUploadResponse(
                 id=image.id,
                 md5=image.md5,
@@ -190,8 +195,10 @@ async def get_images(
             "is_deleted": img.is_deleted,
             "created_at": img.created_at
         }
-        if img_dict.get("thumbnail_url") and settings.THUMBNAIL_URL_PREFIX:
-            img_dict["thumbnail_url"] = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{img_dict['thumbnail_url']}"
+        thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
+        # 数据库中已包含thumbnails目录，直接拼接即可
+        if img_dict.get("thumbnail_url") and thumbnail_url_prefix:
+            img_dict["thumbnail_url"] = f"{thumbnail_url_prefix.rstrip('/')}/{img_dict['thumbnail_url']}"
         processed_images.append(ImageResponse.model_validate(img_dict))
     
     return BaseResponse.paginated_response(
@@ -235,8 +242,10 @@ async def get_image(
         "is_deleted": image.is_deleted,
         "created_at": image.created_at
     }
-    if img_dict.get("thumbnail_url") and settings.THUMBNAIL_URL_PREFIX:
-        img_dict["thumbnail_url"] = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/thumbnails/{img_dict['thumbnail_url']}"
+    thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
+    # 数据库中已包含thumbnails目录，直接拼接即可
+    if img_dict.get("thumbnail_url") and thumbnail_url_prefix:
+        img_dict["thumbnail_url"] = f"{thumbnail_url_prefix.rstrip('/')}/{img_dict['thumbnail_url']}"
     
     return BaseResponse.success_response(
         data=ImageResponse.model_validate(img_dict)
@@ -321,8 +330,10 @@ async def get_image_info(
         "is_deleted": image.is_deleted,
         "created_at": image.created_at
     }
-    if img_dict.get("thumbnail_url") and settings.THUMBNAIL_URL_PREFIX:
-        img_dict["thumbnail_url"] = f"{settings.THUMBNAIL_URL_PREFIX.rstrip('/')}/{img_dict['thumbnail_url']}"
+    thumbnail_url_prefix = await config_cache.get_thumbnail_url_prefix()
+    # 数据库中已包含thumbnails目录，直接拼接即可
+    if img_dict.get("thumbnail_url") and thumbnail_url_prefix:
+        img_dict["thumbnail_url"] = f"{thumbnail_url_prefix.rstrip('/')}/{img_dict['thumbnail_url']}"
     
     return BaseResponse.success_response(
         data=ImageResponse.model_validate(img_dict)
