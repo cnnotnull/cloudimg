@@ -19,7 +19,23 @@ class StorageService:
         limit: int = 100,
         is_active: Optional[bool] = None
     ) -> List[StorageEngine]:
-        """获取所有存储引擎"""
+        """获取所有存储引擎（优先从缓存获取）"""
+        # 如果查询的是激活的存储引擎，优先从缓存获取
+        if is_active is True:
+            # 从缓存获取所有存储引擎
+            cached_storages = storage_cache.get_all_storage_engines()
+            if cached_storages:
+                # 应用分页
+                storage_list = list(cached_storages.values())
+                # 按创建时间降序排序
+                storage_list.sort(key=lambda x: x.created_at, reverse=True)
+                # 应用分页
+                total = len(storage_list)
+                if skip >= total:
+                    return []
+                return storage_list[skip:skip + limit]
+        
+        # 其他情况或缓存为空，从数据库查询
         query = select(StorageEngine)
         
         if is_active is not None:
@@ -31,8 +47,15 @@ class StorageService:
         return list(result.scalars().all())
     
     @staticmethod
-    async def get_by_id(db: AsyncSession, storage_id: int) -> Optional[StorageEngine]:
-        """根据ID获取存储引擎"""
+    async def get_by_id(db: AsyncSession, storage_id: int, from_cache: bool = True) -> Optional[StorageEngine]:
+        """根据ID获取存储引擎（优先从缓存获取）"""
+        # 先从缓存获取（仅用于只读操作）
+        if from_cache:
+            cached_storage = storage_cache.get_storage_engine(storage_id)
+            if cached_storage:
+                return cached_storage
+        
+        # 缓存中不存在或需要从数据库获取，从数据库查询
         result = await db.execute(
             select(StorageEngine).where(StorageEngine.id == storage_id)
         )
@@ -40,7 +63,13 @@ class StorageService:
     
     @staticmethod
     async def get_default(db: AsyncSession) -> Optional[StorageEngine]:
-        """获取默认存储引擎"""
+        """获取默认存储引擎（优先从缓存获取）"""
+        # 先从缓存获取
+        cached_storage = storage_cache.get_default_storage_engine()
+        if cached_storage:
+            return cached_storage
+        
+        # 缓存中不存在，从数据库查询
         result = await db.execute(
             select(StorageEngine)
             .where(StorageEngine.is_default == True)
@@ -113,7 +142,7 @@ class StorageService:
         Returns:
             更新后的存储引擎实例
         """
-        storage = await StorageService.get_by_id(db, storage_id)
+        storage = await StorageService.get_by_id(db, storage_id, from_cache=False)
         if not storage:
             return None
         
@@ -147,7 +176,7 @@ class StorageService:
     @staticmethod
     async def delete(db: AsyncSession, storage_id: int) -> bool:
         """删除存储引擎"""
-        storage = await StorageService.get_by_id(db, storage_id)
+        storage = await StorageService.get_by_id(db, storage_id, from_cache=False)
         if not storage:
             return False
         
@@ -184,7 +213,7 @@ class StorageService:
     @staticmethod
     async def set_default(db: AsyncSession, storage_id: int) -> Optional[StorageEngine]:
         """设置默认存储引擎"""
-        storage = await StorageService.get_by_id(db, storage_id)
+        storage = await StorageService.get_by_id(db, storage_id, from_cache=False)
         if not storage:
             return None
         
@@ -216,12 +245,7 @@ class StorageService:
     async def test_connection(db: AsyncSession, storage_id: int) -> dict:
         """测试存储引擎连接"""
         storage = await StorageService.get_by_id(db, storage_id)
-        if not storage:
-            raise AppException(
-                status_code=404,
-                detail="存储引擎不存在",
-                error_code=ERROR_CODES["STORAGE_NOT_FOUND"]
-            )
+        # test_connection可以使用缓存，因为不需要修改数据库
         
         try:
             # 创建存储实例
@@ -251,12 +275,7 @@ class StorageService:
     async def get_usage(db: AsyncSession, storage_id: int) -> dict:
         """获取存储引擎使用情况"""
         storage = await StorageService.get_by_id(db, storage_id)
-        if not storage:
-            raise AppException(
-                status_code=404,
-                detail="存储引擎不存在",
-                error_code=ERROR_CODES["STORAGE_NOT_FOUND"]
-            )
+        # get_usage可以使用缓存，因为不需要修改数据库
         
         try:
             # 创建存储实例
