@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # 服务器配置
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    DEBUG: bool = True
+    DEBUG: bool = False
     
     # 数据库配置
     DATABASE_URL: str = "sqlite+aiosqlite:///./db/database.db"
