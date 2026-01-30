@@ -8,6 +8,7 @@ dependencies = [
     "aioboto3>=15.5.0",
     "aiosqlite>=0.22.1",
     "alembic>=1.18.3",
+    "alibabacloud-oss-v2>=1.2.3",
     "fastapi[standard]>=0.128.0",
     "pillow>=12.1.0",
     "sqlalchemy>=2.0.46",

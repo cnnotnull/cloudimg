@@ -2,6 +2,7 @@ from typing import Optional
 from app.core.storages.base import StorageBase
 from app.core.storages.local import LocalStorage
 from app.core.storages.s3 import S3Storage
+from app.core.storages.aliyun_oss import AliyunOSSStorage
 
 
 class StorageFactory:
@@ -10,10 +11,12 @@ class StorageFactory:
     _storage_types: dict[str, type[StorageBase]] = {
         "local": LocalStorage,
         "s3": S3Storage,  # AWS S3及兼容服务（MinIO、R2等）
+        "aliyun_oss": AliyunOSSStorage,  # 阿里云OSS
         # 后续可以添加其他存储类型
-        # "oss": OSSStorage,
         # "cos": COSStorage,
         # "r2": R2Storage,
+        # "tencent_cos": TencentCOSSStorage,
+        # "qiniu_kodo": QiniuKodoStorage,
     }
     
     @classmethod

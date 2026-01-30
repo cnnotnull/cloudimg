@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator, field_serializer
 class StorageEngineBase(BaseModel):
     """存储引擎基础模型"""
     name: str = Field(..., description="存储引擎名称", max_length=100)
-    type: str = Field(..., description="存储类型", pattern="^(local|s3|oss|cos|r2)$")
+    type: str = Field(..., description="存储类型", pattern="^(local|s3|aliyun_oss|cos|r2)$")
     config: dict = Field(..., description="存储配置（加密存储）")
     path_rule: str = Field(
         default="uploads/{date}/{filename}.{ext}",
