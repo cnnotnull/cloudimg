@@ -4,6 +4,17 @@ Web 图床系统，支持多种云存储后端的图片上传与管理服务。
 
 前端地址: https://github.com/cnnotnull/cloudimg-vue
 
+**图片上传**
+![图片上传](docs/assets/upload.png)
+**浏览图片**
+![浏览图片](docs/assets/list.png)
+**存储引擎**
+![存储引擎](docs/assets/storage.png)
+**系统配置**
+![系统配置](docs/assets/config.png)
+
+
+
 ## 功能特性
 
 - 多存储引擎支持：本地存储、阿里云 OSS、AWS S3
